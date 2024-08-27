@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zaawansowana Mapa Firmowa</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body, html {
@@ -138,8 +139,13 @@
             border-radius: 50%;
         }
     </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="searchContainer">
+        <input type="text" id="searchInput" placeholder="Wpisz nazwę miasta..." />
+        <button id="searchButton">Szukaj</button>
+    </div>
     <div id="map"></div>
     <button id="addPinButton" class="controlButton">➕ Dodaj pinezkę</button>
     <button id="legendButton" class="controlButton">ℹ️ Legenda</button>
@@ -198,6 +204,10 @@
             </div>
         </div>
     </div>
+    <div id="routeInfoPanel" class="side-panel bottom-right">
+        <div id="routeInfoContent"></div>
+    </div>
+    <button id="routeInfoButton" class="controlButton bottom-right">🚗 Informacje o trasie</button>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -217,5 +227,7 @@
         firebase.initializeApp(firebaseConfig);
     </script>
     <script src="app.js"></script>
+    <script src="animations.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 </body>
 </html>

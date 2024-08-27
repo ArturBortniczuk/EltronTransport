@@ -24,6 +24,92 @@ const legendPanel = document.getElementById('legendPanel');
 const addPinForm = document.getElementById('addPinForm');
 const fillLevelSlider = document.getElementById('fillLevel');
 const fillLevelValue = document.getElementById('fillLevelValue');
+const routeInfoButton = document.getElementById('routeInfoButton');
+const routeInfoPanel = document.getElementById('routeInfoPanel');
+const routeInfoContent = document.getElementById('routeInfoContent');
+
+let startMarker = null;
+let endMarker = null;
+let routeControl = null;
+
+routeInfoButton.addEventListener('click', () => {
+    routeInfoPanel.classList.toggle('visible');
+    routeInfoButton.textContent = routeInfoPanel.classList.contains('visible') ? '❌ Zamknij' : '🚗 Informacje o trasie';
+});
+
+map.on('click', function(e) {
+    if (!startMarker) {
+        startMarker = L.marker(e.latlng).addTo(map);
+    } else if (!endMarker) {
+        endMarker = L.marker(e.latlng).addTo(map);
+        calculateRoute();
+    } else {
+        // Reset
+        if (routeControl) {
+            map.removeControl(routeControl);
+        }
+        map.removeLayer(startMarker);
+        map.removeLayer(endMarker);
+        startMarker = L.marker(e.latlng).addTo(map);
+        endMarker = null;
+        routeControl = null;
+        routeInfoContent.innerHTML = '';
+        routeInfoPanel.classList.remove('visible');
+        routeInfoButton.textContent = '🚗 Informacje o trasie';
+    }
+});
+
+function calculateRoute() {
+    if (routeControl) {
+        map.removeControl(routeControl);
+    }
+
+    routeControl = L.Routing.control({
+        waypoints: [
+            startMarker.getLatLng(),
+            endMarker.getLatLng()
+        ],
+        routeWhileDragging: true,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: false,
+        lineOptions: {
+            styles: [{ color: 'blue', opacity: 0.6, weight: 4 }]
+        },
+        createMarker: function() { return null; },
+        show: false,
+        showAlternatives: true,
+        altLineOptions: {
+            styles: [
+                {color: 'blue', opacity: 0.4, weight: 6},
+                {color: 'yellow', opacity: 0.5, weight: 6}
+            ]
+        }
+    }).addTo(map);
+
+    routeControl.on('routesfound', function(e) {
+        const routes = e.routes;
+        let routesHtml = '';
+
+        routes.forEach((route, index) => {
+            const summary = route.summary;
+            routesHtml += `
+                <div class="route-option">
+                    <h4>Trasa ${index + 1}</h4>
+                    <p>Dystans: ${(summary.totalDistance / 1000).toFixed(2)} km</p>
+                    <p>Szacowany czas: ${Math.round(summary.totalTime / 60)} minut</p>
+                </div>
+            `;
+        });
+
+        routeInfoContent.innerHTML = `
+            <h3>Informacje o trasie</h3>
+            ${routesHtml}
+        `;
+        routeInfoPanel.classList.add('visible');
+        routeInfoButton.textContent = '❌ Zamknij';
+    });
+}
 
 let markers = {};
 
@@ -108,32 +194,28 @@ addPinForm.addEventListener('submit', async (e) => {
 });
 
 const addMarker = debounce(async function(lat, lon, name, cargo, carType, fillLevel, city, dayOfWeek) {
-    // Sprawdź, czy marker o tych współrzędnych już istnieje
     const snapshot = await database.ref('markers').orderByChild('lat').equalTo(lat).once('value');
     let existingMarker = null;
     snapshot.forEach((childSnapshot) => {
         const markerData = childSnapshot.val();
         if (markerData.lon === lon && markerData.active) {
             existingMarker = { key: childSnapshot.key, ...markerData };
-            return true; // Przerywa pętlę forEach
+            return true;
         }
     });
 
     let markerId;
     const now = new Date();
-    const dateStr = now.toISOString().split('T')[0].replace(/-/g, ''); // Format: YYYYMMDD
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
 
-    // Pobierz aktualny licznik dla danego dnia
     const counterRef = database.ref('counters/' + dateStr);
     const counterSnapshot = await counterRef.once('value');
     let counter = counterSnapshot.val() || 0;
     counter++;
 
-    // Utwórz nową nazwę rekordu
     const newRecordName = `${dateStr}-${counter.toString().padStart(3, '0')}`;
 
     if (existingMarker) {
-        // Marker już istnieje, zaktualizuj go
         markerId = existingMarker.key;
         await database.ref('markers/' + markerId).update({
             name, cargo, carType, fillLevel, city, dayOfWeek,
@@ -142,7 +224,6 @@ const addMarker = debounce(async function(lat, lon, name, cargo, carType, fillLe
         });
         console.log('Marker zaktualizowany:', markerId);
     } else {
-        // Dodaj nowy marker
         const newMarkerRef = database.ref('markers').push();
         markerId = newMarkerRef.key;
         await newMarkerRef.set({
@@ -153,7 +234,6 @@ const addMarker = debounce(async function(lat, lon, name, cargo, carType, fillLe
         console.log('Nowy marker dodany:', markerId);
     }
 
-    // Zaktualizuj licznik
     await counterRef.set(counter);
 
     refreshMarkers();
@@ -163,7 +243,6 @@ async function deleteMarker(markerId) {
     if (markers[markerId]) {
         map.removeLayer(markers[markerId]);
         delete markers[markerId];
-        // Zamiast usuwać, ustawiamy flagę active na false
         await database.ref('markers/' + markerId).update({ active: false });
         console.log('Marker oznaczony jako nieaktywny:', markerId);
     }
@@ -171,7 +250,6 @@ async function deleteMarker(markerId) {
 
 function loadMarkers() {
     database.ref('markers').orderByChild('active').equalTo(true).once('value', (snapshot) => {
-        // Wyczyść istniejące markery
         Object.values(markers).forEach(marker => map.removeLayer(marker));
         markers = {};
 
