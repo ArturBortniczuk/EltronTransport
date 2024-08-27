@@ -10,6 +10,60 @@ function debounce(func, wait) {
     };
 }
 
+function checkPassword(action) {
+    return new Promise((resolve) => {
+        const dialogOverlay = document.createElement('div');
+        dialogOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const dialogBox = document.createElement('div');
+        dialogBox.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+        `;
+
+        dialogBox.innerHTML = `
+            <h3>Podaj hasło, aby ${action} pinezkę:</h3>
+            <input type="password" id="passwordInput" style="margin: 10px 0; padding: 5px;">
+            <br>
+            <button id="submitPassword" style="margin-right: 10px;">Potwierdź</button>
+            <button id="cancelPassword">Anuluj</button>
+        `;
+
+        dialogOverlay.appendChild(dialogBox);
+        document.body.appendChild(dialogOverlay);
+
+        const passwordInput = dialogBox.querySelector('#passwordInput');
+        const submitButton = dialogBox.querySelector('#submitPassword');
+        const cancelButton = dialogBox.querySelector('#cancelPassword');
+
+        submitButton.addEventListener('click', () => {
+            const isCorrect = passwordInput.value === '2331';
+            document.body.removeChild(dialogOverlay);
+            resolve(isCorrect);
+        });
+
+        cancelButton.addEventListener('click', () => {
+            document.body.removeChild(dialogOverlay);
+            resolve(false);
+        });
+
+        passwordInput.focus();
+    });
+}
+
 const map = L.map('map').setView([52.0, 19.0], 7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
@@ -165,6 +219,11 @@ fillLevelSlider.addEventListener('input', (e) => {
 
 addPinForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const isPasswordCorrect = await checkPassword('dodać');
+    if (!isPasswordCorrect) {
+        alert('Nieprawidłowe hasło lub operacja anulowana.');
+        return;
+    }
     const name = document.getElementById('pinName').value;
     const address = document.getElementById('pinAddress').value;
     const cargo = document.getElementById('pinCargo').value;
@@ -240,6 +299,11 @@ const addMarker = debounce(async function(lat, lon, name, cargo, carType, fillLe
 }, 300);
 
 async function deleteMarker(markerId) {
+    const isPasswordCorrect = await checkPassword('usunąć');
+    if (!isPasswordCorrect) {
+        alert('Nieprawidłowe hasło lub operacja anulowana.');
+        return;
+    }
     if (markers[markerId]) {
         map.removeLayer(markers[markerId]);
         delete markers[markerId];
@@ -247,7 +311,6 @@ async function deleteMarker(markerId) {
         console.log('Marker oznaczony jako nieaktywny:', markerId);
     }
 }
-
 function loadMarkers() {
     database.ref('markers').orderByChild('active').equalTo(true).once('value', (snapshot) => {
         Object.values(markers).forEach(marker => map.removeLayer(marker));
