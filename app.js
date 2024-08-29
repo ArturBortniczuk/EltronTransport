@@ -82,8 +82,7 @@ const routeInfoButton = document.getElementById('routeInfoButton');
 const routeInfoPanel = document.getElementById('routeInfoPanel');
 const routeInfoContent = document.getElementById('routeInfoContent');
 
-let startMarker = null;
-let endMarker = null;
+let routeMarkers = [];
 let routeControl = null;
 
 routeInfoButton.addEventListener('click', () => {
@@ -92,24 +91,10 @@ routeInfoButton.addEventListener('click', () => {
 });
 
 map.on('click', function(e) {
-    if (!startMarker) {
-        startMarker = L.marker(e.latlng).addTo(map);
-    } else if (!endMarker) {
-        endMarker = L.marker(e.latlng).addTo(map);
+    const marker = L.marker(e.latlng).addTo(map);
+    routeMarkers.push(marker);
+    if (routeMarkers.length > 1) {
         calculateRoute();
-    } else {
-        // Reset
-        if (routeControl) {
-            map.removeControl(routeControl);
-        }
-        map.removeLayer(startMarker);
-        map.removeLayer(endMarker);
-        startMarker = L.marker(e.latlng).addTo(map);
-        endMarker = null;
-        routeControl = null;
-        routeInfoContent.innerHTML = '';
-        routeInfoPanel.classList.remove('visible');
-        routeInfoButton.textContent = '🚗 Informacje o trasie';
     }
 });
 
@@ -118,11 +103,10 @@ function calculateRoute() {
         map.removeControl(routeControl);
     }
 
+    const waypoints = routeMarkers.map(marker => marker.getLatLng());
+
     routeControl = L.Routing.control({
-        waypoints: [
-            startMarker.getLatLng(),
-            endMarker.getLatLng()
-        ],
+        waypoints: waypoints,
         routeWhileDragging: true,
         addWaypoints: false,
         draggableWaypoints: false,
@@ -159,10 +143,25 @@ function calculateRoute() {
         routeInfoContent.innerHTML = `
             <h3>Informacje o trasie</h3>
             ${routesHtml}
+            <button id="clearRouteButton">Wyczyść trasę</button>
         `;
         routeInfoPanel.classList.add('visible');
         routeInfoButton.textContent = '❌ Zamknij';
+
+        document.getElementById('clearRouteButton').addEventListener('click', clearRoute);
     });
+}
+
+function clearRoute() {
+    if (routeControl) {
+        map.removeControl(routeControl);
+    }
+    routeMarkers.forEach(marker => map.removeLayer(marker));
+    routeMarkers = [];
+    routeControl = null;
+    routeInfoContent.innerHTML = '';
+    routeInfoPanel.classList.remove('visible');
+    routeInfoButton.textContent = '🚗 Informacje o trasie';
 }
 
 let markers = {};
@@ -311,6 +310,7 @@ async function deleteMarker(markerId) {
         console.log('Marker oznaczony jako nieaktywny:', markerId);
     }
 }
+
 function loadMarkers() {
     database.ref('markers').orderByChild('active').equalTo(true).once('value', (snapshot) => {
         Object.values(markers).forEach(marker => map.removeLayer(marker));
