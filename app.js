@@ -85,6 +85,36 @@ const routeInfoContent = document.getElementById('routeInfoContent');
 let routeMarkers = [];
 let routeControl = null;
 
+const carTypeMap = {
+    'blaszak_bialystok': 'blaszak',
+    'blaszak_zielonka': 'blaszak',
+    'firanka_bialystok': 'firanka',
+    'firanka_zielonka': 'firanka',
+    'man_stary_bialystok': 'man',
+    'man_nowy_bialystok': 'man',
+    'man_zielonka': 'man'
+};
+
+const polishDayNames = {
+    'monday': 'Poniedziałek',
+    'tuesday': 'Wtorek',
+    'wednesday': 'Środa',
+    'thursday': 'Czwartek',
+    'friday': 'Piątek'
+};
+
+const gpsLinks = {
+    'man_zielonka': 'https://app.flotman.pl/positionaccesslink/17530/PHiW_nG2G0-J75JIWhokDg',
+    'man_bialystok': 'https://app.flotman.pl/positionaccesslink/15464/96wevGrDhEWg1NshaA5W8A',
+    'firanka_bialystok': 'https://app.flotman.pl/positionaccesslink/16022/-IYU-IhzrUidBFBtYcMEdg',
+    'blaszak_bialystok': 'https://app.flotman.pl/positionaccesslink/16283/2gA1IesnHECHsU46B-1lLg',
+    'firanka_zielonka': 'https://app.flotman.pl/positionaccesslink/7712/MhIfGVhKQkWoZT6ZFR68qQ',
+    'blaszak_zielonka': 'https://app.flotman.pl/positionaccesslink/7712/MhIfGVhKQkWoZT6ZFR68qQ',
+    'man_nowy_bialystok': 'https://app.flotman.pl/positionaccesslink/16282/NISVNXQp4UGDO2mMxfRxcQ'
+};
+
+let markers = {};
+
 routeInfoButton.addEventListener('click', () => {
     routeInfoPanel.classList.toggle('visible');
     routeInfoButton.textContent = routeInfoPanel.classList.contains('visible') ? '❌ Zamknij' : '🚗 Informacje o trasie';
@@ -163,26 +193,6 @@ function clearRoute() {
     routeInfoPanel.classList.remove('visible');
     routeInfoButton.textContent = '🚗 Informacje o trasie';
 }
-
-let markers = {};
-
-const carTypeMap = {
-    'blaszak_bialystok': 'blaszak',
-    'blaszak_zielonka': 'blaszak',
-    'firanka_bialystok': 'firanka',
-    'firanka_zielonka': 'firanka',
-    'man_stary_bialystok': 'man',
-    'man_nowy_bialystok': 'man',
-    'man_zielonka': 'man'
-};
-
-const polishDayNames = {
-    'monday': 'Poniedziałek',
-    'tuesday': 'Wtorek',
-    'wednesday': 'Środa',
-    'thursday': 'Czwartek',
-    'friday': 'Piątek'
-};
 
 addPinButton.addEventListener('click', () => {
     addPinPanel.classList.toggle('visible');
@@ -334,6 +344,8 @@ function loadMarkers() {
             const marker = L.marker([lat, lon], { icon: icon, day: dayOfWeek }).addTo(map);
             markers[markerId] = marker;
 
+            const gpsLink = gpsLinks[carType] || '';
+
             const popupContent = `
                 <b>${name}</b><br>
                 Numer rekordu: ${recordName}<br>
@@ -343,63 +355,111 @@ function loadMarkers() {
                 Towar: ${cargo}<br>
                 Zapełnienie: ${fillLevel}/5<br>
                 <button class="delete-button" onclick="deleteMarker('${markerId}')">Usuń pinezkę</button>
-            `;
-            marker.bindPopup(popupContent);
-        });
-        filterMarkers();
-    });
-}
+                                <button class="gps-button" onclick="openGPSLink('${gpsLink}')">Gdzie jest auto?</button>
+                            `;
+                            marker.bindPopup(popupContent);
+                        });
+                        filterMarkers();
+                    });
+                }
 
-function filterMarkers() {
-    const activeDays = Array.from(document.querySelectorAll('.legend-item:not(.inactive)'))
-        .map(item => item.dataset.day);
+                function filterMarkers() {
+                    const activeDays = Array.from(document.querySelectorAll('.legend-item:not(.inactive)'))
+                        .map(item => item.dataset.day);
 
-    Object.values(markers).forEach(marker => {
-        const markerDay = marker.options.day;
-        if (activeDays.includes(markerDay)) {
-            if (!map.hasLayer(marker)) {
-                map.addLayer(marker);
-            }
-        } else {
-            if (map.hasLayer(marker)) {
-                map.removeLayer(marker);
-            }
-        }
-    });
-}
+                    Object.values(markers).forEach(marker => {
+                        const markerDay = marker.options.day;
+                        if (activeDays.includes(markerDay)) {
+                            if (!map.hasLayer(marker)) {
+                                map.addLayer(marker);
+                            }
+                        } else {
+                            if (map.hasLayer(marker)) {
+                                map.removeLayer(marker);
+                            }
+                        }
+                    });
+                }
 
-document.querySelectorAll('.legend-item').forEach(item => {
-    item.addEventListener('click', () => {
-        item.classList.toggle('inactive');
-        filterMarkers();
-    });
-});
+                function openGPSLink(gpsLink) {
+                    if (gpsLink) {
+                        window.open(gpsLink, '_blank');
+                    } else {
+                        alert('Link do lokalizacji GPS nie jest dostępny dla tego pojazdu.');
+                    }
+                }
 
-async function initDailyCounter() {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
-    const counterRef = database.ref('counters/' + dateStr);
-    const counterSnapshot = await counterRef.once('value');
-    if (!counterSnapshot.exists()) {
-        await counterRef.set(0);
-    }
-}
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        item.classList.toggle('inactive');
+                        filterMarkers();
+                    });
+                });
 
-function refreshMarkers() {
-    loadMarkers();
-}
+                async function initDailyCounter() {
+                    const now = new Date();
+                    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+                    const counterRef = database.ref('counters/' + dateStr);
+                    const counterSnapshot = await counterRef.once('value');
+                    if (!counterSnapshot.exists()) {
+                        await counterRef.set(0);
+                    }
+                }
 
-window.deleteMarker = deleteMarker;
+                function refreshMarkers() {
+                    loadMarkers();
+                }
 
-initDailyCounter();
-loadMarkers();
+                window.deleteMarker = deleteMarker;
+                window.openGPSLink = openGPSLink;
 
-window.addEventListener('resize', () => {
-    map.invalidateSize();
-});
+                initDailyCounter();
+                loadMarkers();
 
-// Dodaj przycisk do ręcznego odświeżania markerów
-const refreshButton = document.createElement('button');
-refreshButton.textContent = 'Odśwież markery';
-refreshButton.onclick = refreshMarkers;
-document.body.appendChild(refreshButton);
+                window.addEventListener('resize', () => {
+                    map.invalidateSize();
+                });
+
+                // Dodaj przycisk do ręcznego odświeżania markerów
+                const refreshButton = document.createElement('button');
+                refreshButton.textContent = 'Odśwież markery';
+                refreshButton.onclick = refreshMarkers;
+                document.body.appendChild(refreshButton);
+
+                // Funkcja wyszukiwania miasta
+                function searchCity(city) {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Otrzymane dane:', data);  // Sprawdzenie zwracanych danych
+                            if (data.length > 0) {
+                                const latitude = parseFloat(data[0].lat);
+                                const longitude = parseFloat(data[0].lon);
+                                map.setView([latitude, longitude], 12);
+                            } else {
+                                alert('Nie znaleziono miasta. Spróbuj ponownie.');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Błąd podczas wyszukiwania miasta:', error);
+                            alert('Wystąpił błąd podczas wyszukiwania. Spróbuj ponownie.');
+                        });
+                }
+
+                // Eventy dla wyszukiwania
+                document.getElementById('searchButton').addEventListener('click', function() {
+                    const query = document.getElementById('searchInput').value;
+                    if (query) {
+                        searchCity(query);
+                    }
+                });
+
+                document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const query = document.getElementById('searchInput').value;
+                        if (query) {
+                            searchCity(query);
+                        }
+                    }
+                });
